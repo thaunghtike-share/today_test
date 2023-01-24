@@ -1,0 +1,91 @@
+service: data-startupjobs
+provider:
+  name: aws
+  runtime: python3.9
+  stage: prod
+  region: us-west-2
+  deploymentBucket:
+    name: infra.opszero.com
+  environment:
+    DYNAMODB_TABLE_NAME: ${self:service}-${sls:stage}
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+      - dynamodb:*
+      Resource:
+        Fn::GetAtt:
+          - oneTable
+          - Arn
+  #   - Effect: "Allow"
+  #     Action:
+  #     - s3:*
+  #     Resource:
+  #       Fn::Join:
+  #         - ""
+  #         - - "arn:aws:s3:::"
+  #           - "Ref" : "setupname"
+  #           - '/*'
+
+functions:
+  api:
+    url:
+      cors: true
+    timeout: 29
+    memorySize: 128
+    handler: app.handler
+  # handler:
+  #   handler: handler.hello
+  #   timeout: 300
+  #   memorySize: 512
+  #   events:
+  #   - schedule: cron(0/15 18-21 ? * * *)
+  # warm_up:
+  #   handler: warm_up.handler
+  #   timeout: 300
+  #   memorySize: 512
+  #   events:
+  #   - schedule: cron(0/5 * ? * * *)
+  #   environment:
+  #     BASE_URL: { "Fn::Join" : ["", [" https://", { "Ref" : "ApiGatewayRestApi" }, ".execute-api.${self:custom.region}.amazonaws.com/${self:custom.stage}" ] ]  }
+
+plugins:
+  - serverless-python-requirements
+
+custom:
+  stage: ${opt:stage, self:provider.stage}
+  region: ${opt:region, self:provider.region}
+  pythonRequirements:
+    dockerizePip: true
+    dockerImage: python:3.9
+
+package:
+  patterns:
+    - '!node_modules/**'
+
+resources:
+  Resources:
+    oneTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${sls:stage}
+        AttributeDefinitions:
+          - AttributeName: pk
+            AttributeType: S
+          - AttributeName: sk
+            AttributeType: S
+        KeySchema:
+          - AttributeName: pk
+            KeyType: HASH
+          - AttributeName: sk
+            KeyType: RANGE
+        # ProvisionedThroughput:
+        #   ReadCapacityUnits: 1
+        #   WriteCapacityUnits: 1
+        BillingMode: PAY_PER_REQUEST
+#     s3bucket:
+#       Type: AWS::S3::Bucket
+#       Properties:
+#         BucketName: setupname
+#         AccessControl: PublicRead
+#         WebsiteConfiguration:
+#           IndexDocument: index.html
